@@ -3,4 +3,8 @@ id,name,age
 2,Grace,22
 3,Alan,20
 5,Bob,19
+<<<<<<< Updated upstream
 6,Tim,17
+=======
+6,Tim,19
+>>>>>>> Stashed changes

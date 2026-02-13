@@ -1,0 +1,55 @@
+---
+# .github/workflows/pipeline.yaml
+
+# We give our pipeline a descriptive name
+name: Validate data and update average
+
+# We give GitHub permission to change repositories
+permissions:
+  contents: write
+
+# We run this when we make a push specifically into data;
+# e.g. we do not want an updated README to trigger this
+on:
+  push:
+    paths:
+      - "data/**"
+
+jobs:
+  pipeline:
+    # Quietly, this is all happening in Linux
+    runs-on: ubuntu-latest
+
+    # The pipeline is one step after another; we identify them in order
+    steps:
+
+      # We need to "check out" our workspace to access it
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      # GitHub is not a Python environment, we need to set Python up to use it
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Run the Python script
+      # Note: This updates average_age.txt inside the runner environment
+      - name: Run validation + computation
+        run: python validate_and_compute.py
+
+      # Now we commit the updated file back to the repository
+      - name: Commit updated average_age.txt
+        run: |
+          # Configure git identity for automated commit
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Stage the updated file
+          git add average_age.txt
+
+          # Commit (if changes exist)
+          git commit -m "Recompute average age from students.csv" || echo "No changes to commit"
+
+          # Push back to repository
+          git push

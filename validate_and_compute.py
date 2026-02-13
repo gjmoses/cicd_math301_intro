@@ -2,73 +2,53 @@ import csv
 import sys
 from pathlib import Path
 
-
 DATA_PATH = Path("data") / "students.csv"
 OUTPUT_PATH = Path("average_age.txt")
 
 
-def validate_csv(path: Path):
+def parse_and_validate_students(path: Path) -> list[int]:
     if not path.exists():
-        raise FileNotFoundError(f"{path} does not exist.")
+        raise FileNotFoundError(f"Missing required file: {path}")
 
     with path.open(newline="", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        rows = list(reader)
+        reader = csv.DictReader(f)
 
-    if not rows:
-        raise ValueError("CSV file is empty.")
+        expected = ["id", "name", "age"]
+        if reader.fieldnames != expected:
+            raise ValueError(f"Expected header {expected}, got {reader.fieldnames}")
 
-    header = rows[0]
-    expected_header = ["id", "name", "age"]
+        ages: list[int] = []
+        for row_num, row in enumerate(reader, start=2):  # header is line 1
+            age_str = (row.get("age") or "").strip()
 
-    if header != expected_header:
-        raise ValueError(
-            f"Expected header {expected_header}, but got {header}"
-        )
+            # Reject anything that isn't digits only
+            if not age_str.isdigit():
+                raise ValueError(f"Row {row_num}: age must be a non-negative integer, got {age_str!r}")
 
-    ages = []
+            ages.append(int(age_str))
 
-    for i, row in enumerate(rows[1:], start=2):  # start=2 for line numbers
-        if len(row) != 3:
-            raise ValueError(f"Row {i} does not have exactly 3 columns: {row}")
+        if not ages:
+            raise ValueError("No data rows found in students.csv")
 
-        age_str = row[2]
-
-        if not age_str.isdigit():
-            raise ValueError(f"Row {i}: age must be a non-negative integer, got {age_str!r}")
-
-        age = int(age_str)
-
-        if age < 0:
-            raise ValueError(f"Row {i}: age cannot be negative, got {age}")
-
-        ages.append(age)
-
-    if not ages:
-        raise ValueError("No student rows found.")
-
-    return ages
+        return ages
 
 
-def compute_average(ages):
-    return sum(ages) / len(ages)
+def write_average(avg: float, path: Path) -> None:
+    path.write_text(f"Average age: {avg:.2f}\n", encoding="utf-8")
 
 
-def write_output(avg, path: Path):
-    with path.open("w", encoding="utf-8") as f:
-        f.write(f"Average age: {avg:.2f}\n")
-
-
-def main():
-    try:
-        ages = validate_csv(DATA_PATH)
-        avg = compute_average(ages)
-        write_output(avg, OUTPUT_PATH)
-        print("Validation passed. Average age computed and written successfully.")
-    except Exception as e:
-        print(f"ERROR: {e}")
-        sys.exit(1)  # This makes GitHub Actions fail the job
+def main() -> int:
+    ages = parse_and_validate_students(DATA_PATH)
+    avg = sum(ages) / len(ages)
+    write_average(avg, OUTPUT_PATH)
+    print(f"OK: wrote {OUTPUT_PATH} (n={len(ages)}, avg={avg:.2f})")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except Exception as e:
+        # Critical: non-zero exit code so Actions FAILS and does not proceed
+        print(f"ERROR: {e}", file=sys.stderr)
+        raise SystemExit(1)
